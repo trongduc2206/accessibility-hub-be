@@ -7,10 +7,7 @@ app.get('/', (request, response) => {
 
 app.get('/rules', (request, response) => {
     const rules = "html-has-lang"
-    const data = {
-        rules
-    }
-    response.json(data)
+    response.send(rules)
 })
 
 const PORT = process.env.PORT || 3000
