@@ -37,7 +37,12 @@ app.get('/rules/:id', (request, response) => {
         if (error) {
           throw error
         }
-        response.status(200).json(results.rows)
+        if(results.rows && results.rows.length > 0) {
+          const rule = results.rows[0]
+          response.status(200).json(rule.rule_ids)  
+        } else {
+          response.status(404)
+        }
       })
 })
 
