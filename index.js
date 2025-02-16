@@ -43,7 +43,7 @@ app.get('/rules/:id', (request, response) => {
           const rule = results.rows[0]
           response.send(rule.rule_ids)  
         } else {
-          response.status(404)
+          response.status(404).send();
         }
       })
 })
@@ -87,6 +87,7 @@ app.delete('/rules/:id', (request, response) => {
         response.status(200).send(`${request.params.id}`)
       })
 })
+
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
