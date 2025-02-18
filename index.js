@@ -19,6 +19,7 @@ pool.connect((err) => {
     }
     console.log('connected to database');
   });
+const axe = require('axe-core')
 const express = require('express')
 const app = express()
 const cors = require('cors')
@@ -32,6 +33,20 @@ app.get('/', (request, response) => {
 app.get('/rules-test', (request, response) => {
     const rules = "html-has-lang"
     response.send(rules)
+})
+
+app.get('/axe-rules', (request, response) => {
+  const tags = request.query.tags;
+  let axeRules;
+
+  if (tags) {
+    const tagsArray = tags.split(',');
+    axeRules = axe.getRules(tagsArray);
+  } else {
+    axeRules = axe.getRules();
+  }
+
+  response.send(axeRules);
 })
 
 app.get('/rules/:id', (request, response) => {
