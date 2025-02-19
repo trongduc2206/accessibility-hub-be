@@ -19,7 +19,6 @@ pool.connect((err) => {
     }
     console.log('connected to database');
   });
-const axe = require('axe-core')
 const express = require('express')
 const app = express()
 const cors = require('cors')
@@ -33,20 +32,6 @@ app.get('/', (request, response) => {
 app.get('/rules-test', (request, response) => {
     const rules = "html-has-lang"
     response.send(rules)
-})
-
-app.get('/axe-rules', (request, response) => {
-  const tags = request.query.tags;
-  let axeRules;
-
-  if (tags) {
-    const tagsArray = tags.split(',');
-    axeRules = axe.getRules(tagsArray);
-  } else {
-    axeRules = axe.getRules();
-  }
-
-  response.send(axeRules);
 })
 
 app.get('/rules/:id', (request, response) => {
@@ -101,6 +86,24 @@ app.delete('/rules/:id', (request, response) => {
         }
         response.status(200).send(`${request.params.id}`)
       })
+})
+
+app.post('/extract-rule-ids', (request, response) => {
+  const { output } = request.body;
+
+  if (!output) {
+      return response.status(400).send('No output provided');
+  }
+
+  const ruleIds = [];
+  const regex = /Violation of "([^"]+)"/g;
+  let match;
+
+  while ((match = regex.exec(output)) !== null) {
+      ruleIds.push(match[1]);
+  }
+
+  response.status(200).json({ ruleIds });
 })
 
 
