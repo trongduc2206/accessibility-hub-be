@@ -113,6 +113,23 @@ app.post('/extract-rule-ids', (request, response) => {
     })
 })
 
+app.get('/manual-failed-rule-ids/:id', (request, response) => {
+  const serviceId = request.params.id;
+
+  pool.query('SELECT manual_failed_rule_ids FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
+      if (error) {
+          throw error
+      }
+      if (results.rows && results.rows.length > 0) {
+          const ruleIdsString = results.rows[0].manual_failed_rule_ids;
+          const ruleIdsArray = ruleIdsString ? ruleIdsString.split(',') : [];
+          response.status(200).json({ service_id: serviceId, manual_failed_rule_ids: ruleIdsArray });
+      } else {
+          response.status(404).send('Service ID not found');
+      }
+  })
+})
+
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
