@@ -1,6 +1,6 @@
 require('dotenv').config()
 
-const {Pool} = require('pg')
+const { Pool } = require('pg')
 const pool = new Pool({
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
@@ -9,16 +9,16 @@ const pool = new Pool({
     database: process.env.DB_DATABASE,
     ssl: {
         rejectUnauthorized: false, // May need to be `true` in production
-      }
+    }
 })
 // client.connect().then(() => {console.log("connect to database")}).catch((error) => {console.log(error)})
 pool.connect((err) => {
     if (err) {
-      console.log(err);
-      return;
+        console.log(err);
+        return;
     }
     console.log('connected to database');
-  });
+});
 const express = require('express')
 const app = express()
 const cors = require('cors')
@@ -37,15 +37,15 @@ app.get('/rules-test', (request, response) => {
 app.get('/rules/:id', (request, response) => {
     pool.query(`SELECT * FROM service_rules WHERE service_id='${request.params.id}' `, (error, results) => {
         if (error) {
-          throw error
+            throw error
         }
-        if(results.rows && results.rows.length > 0) {
-          const rule = results.rows[0]
-          response.send(rule.rule_ids)  
+        if (results.rows && results.rows.length > 0) {
+            const rule = results.rows[0]
+            response.send(rule.rule_ids)
         } else {
-          response.status(404).send();
+            response.status(404).send();
         }
-      })
+    })
 })
 
 app.post('/rules', (request, response) => {
@@ -57,11 +57,11 @@ app.post('/rules', (request, response) => {
 
     pool.query('INSERT INTO service_rules (service_id, rule_ids) VALUES ($1, $2) RETURNING *', [serviceId, ruleIds], (error, results) => {
         if (error) {
-          throw error
+            throw error
         }
         console.log(results.rows[0])
         response.status(201).send(`${results.rows[0].service_id}`)
-      })
+    })
 })
 
 app.put('/rules/:id', (request, response) => {
@@ -72,42 +72,48 @@ app.put('/rules/:id', (request, response) => {
 
     pool.query('UPDATE service_rules SET rule_ids=$2 WHERE service_id=$1 RETURNING *', [request.params.id, ruleIds], (error, results) => {
         if (error) {
-          throw error
+            throw error
         }
         console.log(results.rows[0])
         response.status(200).send(`${results.rows[0].service_id}`)
-      })
+    })
 })
 
 app.delete('/rules/:id', (request, response) => {
     pool.query('DELETE FROM service_rules WHERE service_id=$1 RETURNING *', [request.params.id], (error, results) => {
         if (error) {
-          throw error
+            throw error
         }
         response.status(200).send(`${request.params.id}`)
-      })
+    })
 })
 
 app.post('/extract-rule-ids', (request, response) => {
-  const { output } = request.body;
+    const { output, serviceId } = request.body;
 
-  if (!output) {
-      return response.status(400).send('No output provided');
-  }
+    if (!output || !serviceId) {
+        return response.status(400).send('No output or service_id provided');
+    }
 
-  const ruleIds = [];
-  const regex = /Violation of "([^"]+)"/g;
-  let match;
+    const ruleIds = [];
+    const regex = /Violation of "([^"]+)"/g;
+    let match;
 
-  while ((match = regex.exec(output)) !== null) {
-      ruleIds.push(match[1]);
-  }
+    while ((match = regex.exec(output)) !== null) {
+        ruleIds.push(match[1]);
+    }
 
-  response.status(200).json({ ruleIds });
+    const ruleIdsString = ruleIds.join(',');
+
+    pool.query('UPDATE service_rules SET manual_failed_rule_ids=$2 WHERE service_id=$1 RETURNING *', [serviceId, ruleIdsString], (error, results) => {
+        if (error) {
+            throw error
+        }
+        response.status(200).json({ service_id: results.rows[0].service_id, manual_failed_rule_ids: results.rows[0].manual_failed_rule_ids });
+    })
 })
-
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
+    console.log(`Server running on port ${PORT}`)
 })
