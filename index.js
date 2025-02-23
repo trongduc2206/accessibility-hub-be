@@ -34,6 +34,20 @@ app.get('/rules-test', (request, response) => {
     response.send(rules)
 })
 
+app.post('/service-id', (request, response) => {
+  const { serviceName }  = request.body;
+  pool.query('SELECT service_id FROM service_rules WHERE service_name=$1', [serviceName], (error, results) => {
+      if (error) {
+          throw error
+      }
+      if (results.rows && results.rows.length > 0) {
+          response.status(200).json({ service_id: results.rows[0].service_id });
+      } else {
+          response.status(404).send('Service name not found');
+      }
+  })
+})
+
 app.get('/rules/:id', (request, response) => {
     pool.query(`SELECT * FROM service_rules WHERE service_id='${request.params.id}' `, (error, results) => {
         if (error) {
@@ -51,11 +65,14 @@ app.get('/rules/:id', (request, response) => {
 app.post('/rules', (request, response) => {
     console.log(request.body)
     const {
-        serviceId,
+        serviceName,
         ruleIds
     } = request.body
 
-    pool.query('INSERT INTO service_rules (service_id, rule_ids) VALUES ($1, $2) RETURNING *', [serviceId, ruleIds], (error, results) => {
+    const serviceId = serviceName.toLowerCase().replace(/\s+/g, '') + Math.floor(10000 + Math.random() * 90000);
+    console.log('serviceId:', serviceId);
+
+    pool.query('INSERT INTO service_rules (service_name, service_id, rule_ids) VALUES ($1, $2, $3) RETURNING *', [serviceName, serviceId, ruleIds], (error, results) => {
         if (error) {
             throw error
         }
