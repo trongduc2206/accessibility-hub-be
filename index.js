@@ -62,6 +62,20 @@ app.get('/rules/:id', (request, response) => {
     })
 })
 
+app.get('/ignore-pa11y-rules/:id', (request, response) => {
+    pool.query(`SELECT ignore_pa11y_rule_ids FROM service_rules WHERE service_id='${request.params.id}' `, (error, results) => {
+        if (error) {
+            throw error
+        }
+        if (results.rows && results.rows.length > 0) {
+            const ignoredRules = results.rows[0]
+            response.send(ignoredRules)
+        } else {
+            response.status(404).send();
+        }
+    })
+})
+
 app.post('/rules', (request, response) => {
     console.log(request.body)
     const {
