@@ -151,7 +151,7 @@ app.post('/extract-rule-codes', (request, response) => {
         if (error) {
             throw error
         }
-        response.status(200).json({ service_id: results.rows[0].service_id, manual_failed_rule_codes: results.rows[0].manual_failed_rule_codes });
+        response.status(200).json({ service_id: results.rows[0].service_id, manual_failed_rule_codes: results.rows[0].manual_failed_rule_ids_pa11y });
     })
 });
 
