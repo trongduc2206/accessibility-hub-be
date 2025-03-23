@@ -69,7 +69,7 @@ app.get('/ignore-pa11y-rules/:id', (request, response) => {
         }
         if (results.rows && results.rows.length > 0) {
             const ignoredRules = results.rows[0]
-            response.send(ignoredRules)
+            response.send(ignoredRules.ignore_pa11y_rule_ids)
         } else {
             response.status(404).send();
         }
