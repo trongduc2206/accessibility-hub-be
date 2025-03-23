@@ -159,14 +159,16 @@ app.post('/extract-rule-codes', (request, response) => {
 app.get('/manual-failed-rule-ids/:id', (request, response) => {
   const serviceId = request.params.id;
 
-  pool.query('SELECT manual_failed_rule_ids FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
+  pool.query('SELECT manual_failed_rule_ids, manual_failed_rule_ids_pa11y  FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
       if (error) {
           throw error
       }
       if (results.rows && results.rows.length > 0) {
           const ruleIdsString = results.rows[0].manual_failed_rule_ids;
           const ruleIdsArray = ruleIdsString ? ruleIdsString.split(',') : [];
-          response.status(200).json({ service_id: serviceId, manual_failed_rule_ids: ruleIdsArray });
+          const ruleCodesString = results.rows[0].manual_failed_rule_ids_pa11y;
+          const ruleCodesArray = ruleCodesString ? ruleCodesString.split(',') : [];
+          response.status(200).json({ service_id: serviceId, manual_failed_rule_ids: ruleIdsArray, manual_failed_rule_ids_pa11y: ruleCodesArray });
       } else {
           response.status(404).send('Service ID not found');
       }
