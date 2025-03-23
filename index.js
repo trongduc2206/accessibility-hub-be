@@ -130,6 +130,32 @@ app.post('/extract-rule-ids', (request, response) => {
     })
 })
 
+app.post('/extract-rule-codes', (request, response) => {
+    const { output, serviceId } = request.body;
+
+    if (!output || !serviceId) {
+        return response.status(400).send('No output or service_id provided');
+    }
+
+    const ruleCodes = [];
+    const regex = /├── (WCAG2AA\.[^\s]+)/g; // Regex to match rule codes
+    let match;
+
+    while ((match = regex.exec(output)) !== null) {
+        ruleCodes.push(match[1]);
+    }
+
+    const ruleCodesString = ruleCodes.join(',');
+
+    pool.query('UPDATE service_rules SET manual_failed_rule_ids_pa11y=$2 WHERE service_id=$1 RETURNING *', [serviceId, ruleCodesString], (error, results) => {
+        if (error) {
+            throw error
+        }
+        response.status(200).json({ service_id: results.rows[0].service_id, manual_failed_rule_codes: results.rows[0].manual_failed_rule_codes });
+    })
+});
+
+
 app.get('/manual-failed-rule-ids/:id', (request, response) => {
   const serviceId = request.params.id;
 

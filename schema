@@ -1,0 +1,14 @@
+-- public.service_rules definition
+
+-- Drop table
+
+-- DROP TABLE public.service_rules;
+
+CREATE TABLE public.service_rules (
+	id serial4 NOT NULL,
+	service_name varchar NOT NULL,
+	service_id varchar NULL,
+	rule_ids varchar NULL,
+	manual_failed_rule_ids varchar NULL,
+	CONSTRAINT service_rules_pk PRIMARY KEY (id)
+);
