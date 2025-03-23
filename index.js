@@ -96,6 +96,21 @@ app.put('/rules/:id', (request, response) => {
     })
 })
 
+app.put('/ignore-pa11y-rules/:id', (request, response) => {
+    console.log(request.body)
+    const {
+        ruleIds
+    } = request.body
+
+    pool.query('UPDATE service_rules SET ignore_pa11y_rule_ids=$2 WHERE service_id=$1 RETURNING *', [request.params.id, ruleIds], (error, results) => {
+        if (error) {
+            throw error
+        }
+        console.log(results.rows[0])
+        response.status(200).send(`${results.rows[0].service_id}`)
+    })
+})
+
 app.delete('/rules/:id', (request, response) => {
     pool.query('DELETE FROM service_rules WHERE service_id=$1 RETURNING *', [request.params.id], (error, results) => {
         if (error) {
