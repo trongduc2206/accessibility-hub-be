@@ -144,8 +144,9 @@ app.post('/extract-rule-codes', (request, response) => {
     while ((match = regex.exec(output)) !== null) {
         ruleCodes.push(match[1]);
     }
+    const uniqueRuleCodes = [...new Set(ruleCodes)];
 
-    const ruleCodesString = ruleCodes.join(',');
+    const ruleCodesString = uniqueRuleCodes.join(',');
 
     pool.query('UPDATE service_rules SET manual_failed_rule_ids_pa11y=$2 WHERE service_id=$1 RETURNING *', [serviceId, ruleCodesString], (error, results) => {
         if (error) {
