@@ -145,6 +145,7 @@ app.post('/extract-rule-codes', (request, response) => {
         ruleCodes.push(match[1]);
     }
     const uniqueRuleCodes = [...new Set(ruleCodes)];
+    console.log('uniqueRuleCodes:', uniqueRuleCodes);
 
     const ruleCodesString = uniqueRuleCodes.join(',');
 
