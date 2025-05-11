@@ -1,0 +1,23 @@
+# Use Node.js Debian-based image
+FROM node:20-bullseye
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies
+RUN apt update && apt install -y curl unzip wget
+
+# Install Chrome manually
+RUN wget -qO- https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb > chrome.deb \
+    && apt install -y ./chrome.deb \
+    && rm chrome.deb
+
+# Install Axe CLI globally
+RUN npm install -g @axe-core/cli
+
+# Copy and set permissions for the script
+COPY run-axe.sh /usr/local/bin/run-axe.sh
+RUN chmod +x /usr/local/bin/run-axe.sh
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/run-axe.sh"]
