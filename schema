@@ -9,6 +9,8 @@ CREATE TABLE public.service_rules (
 	service_name varchar NOT NULL,
 	service_id varchar NULL,
 	rule_ids varchar NULL,
+	ignore_pa11y_rule_ids varchar NULL,
 	manual_failed_rule_ids varchar NULL,
+	manual_failed_rule_ids_pa11y varchar NULL,
 	CONSTRAINT service_rules_pk PRIMARY KEY (id)
 );
