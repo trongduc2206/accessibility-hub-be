@@ -186,6 +186,21 @@ app.post('/extract-rule-codes', (request, response) => {
     })
 });
 
+app.post('/axe-full-manual', (request, response) => {
+    const { output, serviceId } = request.body;
+
+    if (!output || !serviceId) {
+        return response.status(400).send('No output or service_id provided');
+    }
+
+    pool.query('UPDATE service_rules SET axe_full_manual_result=$2 WHERE service_id=$1 RETURNING *', [serviceId, output], (error, results) => {
+        if (error) {
+            throw error
+        }
+        response.status(200).json({ service_id: results.rows[0].service_id });
+    })
+})
+
 
 app.get('/manual-failed-rule-ids/:id', (request, response) => {
   const serviceId = request.params.id;
