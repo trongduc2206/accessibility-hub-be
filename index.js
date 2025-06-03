@@ -25,6 +25,12 @@ const cors = require('cors')
 app.use(cors())
 app.use(express.json())
 
+const { OpenAI } = require("openai");
+
+const openaiClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 app.get('/', (request, response) => {
     response.send('<h1>Welcome to Accessibility Hub APIs!</h1>')
 })
@@ -230,6 +236,27 @@ app.get('/axe-full-manual/:id', (request, response) => {
         if (results.rows && results.rows.length > 0) {
             const axeFullManualResult = results.rows[0].axe_full_manual_result;
             response.status(200).json({ service_id: serviceId, axe_full_manual_result: axeFullManualResult });
+        } else {
+            response.status(404).send('Service ID not found');
+        }
+    })
+})
+
+app.get('/axe-instruction/:id', async (request, response) => {
+    const serviceId = request.params.id;
+    pool.query('SELECT axe_full_manual_result FROM service_rules WHERE service_id=$1', [serviceId], async (error, results) => {
+        if (error) {
+            throw error
+        }
+        if (results.rows && results.rows.length > 0) {
+            const axeFullManualResult = results.rows[0].axe_full_manual_result;
+             const instruction = await openaiClient.responses.create({
+                model: "gpt-4o-mini",
+                instructions: "Talk like a web accessibility expert.",
+                input: `How to fix the accessibility issues from this evaluation result: ${axeFullManualResult}?`,
+            });
+            console.log("Response:", instruction);
+            response.status(200).json({ service_id: serviceId, instruction: instruction.output_text });
         } else {
             response.status(404).send('Service ID not found');
         }
