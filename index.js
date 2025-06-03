@@ -221,6 +221,21 @@ app.get('/manual-failed-rule-ids/:id', (request, response) => {
   })
 })
 
+app.get('/axe-full-manual/:id', (request, response) => {
+  const serviceId = request.params.id;
+    pool.query('SELECT axe_full_manual_result FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
+        if (error) {
+            throw error
+        }
+        if (results.rows && results.rows.length > 0) {
+            const axeFullManualResult = results.rows[0].axe_full_manual_result;
+            response.status(200).json({ service_id: serviceId, axe_full_manual_result: axeFullManualResult });
+        } else {
+            response.status(404).send('Service ID not found');
+        }
+    })
+})
+
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
