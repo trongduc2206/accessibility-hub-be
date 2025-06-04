@@ -61,10 +61,22 @@ elif [ "$TOOL" = "axe" ]; then
       echo "Error: Failed to send request to /extract-rule-codes endpoint."
       exit 1
     fi
+
+    # Send the output to the /axe-full-manual endpoint
+    RESPONSE2=$(curl -s --max-time 10  -X POST -H "Content-Type: application/json" -d "{\"output\":$ESCAPED_AXE_OUTPUT, \"serviceId\":\"$SERVICE_ID\"}" https://accessibility-hub-be.onrender.com/axe-full-manual)
+
+    # Check for errors
+    if [ $? -ne 0 ]; then
+      echo "Error: Failed to send request to /axe-full-manual endpoint."
+      exit 1
+    fi
     
     # Show the response from the /extract-rule-ids endpoint
     echo "Response from /extract-rule-ids endpoint:"
     echo "$RESPONSE"
+
+    echo "Response from /axe-full-manual endpoint:"
+    echo "$RESPONSE2"
   else
     # Fetch rule IDs from the API
     echo "Fetching rule IDs..."

@@ -12,5 +12,7 @@ CREATE TABLE public.service_rules (
 	ignore_pa11y_rule_ids varchar NULL,
 	manual_failed_rule_ids varchar NULL,
 	manual_failed_rule_ids_pa11y varchar NULL,
+	axe_full_manual_resut text NULL,
+	axe_instruction text NULL,
 	CONSTRAINT service_rules_pk PRIMARY KEY (id)
 );

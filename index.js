@@ -242,26 +242,105 @@ app.get('/axe-full-manual/:id', (request, response) => {
     })
 })
 
+// app.get('/axe-instruction/:id', async (request, response) => {
+//     const serviceId = request.params.id;
+
+//     let axeInstructionInDb = false;
+//     pool.query('SELECT axe_instruction FROM service_rules WHERE service_id=$1', [serviceId], async (error, results) => {
+//         if (error) {
+//             throw error
+//         }
+//         if (results.rows && results.rows.length > 0) {
+//             const axeInstruction = results.rows[0].axe_instruction;
+//             if (axeInstruction) {
+//                 axeInstructionInDb = true;
+//             }
+//             response.status(200).json({ service_id: serviceId, axe_instruction: axeInstruction });
+//             return;
+//         }
+//     })
+
+
+//     if(!axeInstructionInDb) {
+//         pool.query('SELECT axe_full_manual_result FROM service_rules WHERE service_id=$1', [serviceId], async (error, results) => {
+//             if (error) {
+//                 throw error
+//             }
+//             if (results.rows && results.rows.length > 0) {
+//                 const axeFullManualResult = results.rows[0].axe_full_manual_result;
+//                 const instruction = await openaiClient.responses.create({
+//                     model: "gpt-4o-mini",
+//                     instructions: "Talk like a web accessibility expert.",
+//                     input: `How to fix the accessibility issues from this evaluation result: ${axeFullManualResult}?`,
+//                 });
+//                 console.log("Response:", instruction);
+//                 pool.query('UPDATE service_rules SET axe_instruction=$2 WHERE service_id=$1 RETURNING *', [serviceId, instruction.output_text], (error, results) => {
+//                     if (error) {
+//                         throw error
+//                     }
+//                 });
+//                 response.status(200).json({ service_id: serviceId, instruction: instruction.output_text });
+//             } else {
+//                 response.status(404).send('Service ID not found');
+//             }
+//         })
+//     }
+// })
+
 app.get('/axe-instruction/:id', async (request, response) => {
-    const serviceId = request.params.id;
-    pool.query('SELECT axe_full_manual_result FROM service_rules WHERE service_id=$1', [serviceId], async (error, results) => {
-        if (error) {
-            throw error
-        }
-        if (results.rows && results.rows.length > 0) {
-            const axeFullManualResult = results.rows[0].axe_full_manual_result;
-             const instruction = await openaiClient.responses.create({
-                model: "gpt-4o-mini",
-                instructions: "Talk like a web accessibility expert.",
-                input: `How to fix the accessibility issues from this evaluation result: ${axeFullManualResult}?`,
-            });
-            console.log("Response:", instruction);
-            response.status(200).json({ service_id: serviceId, instruction: instruction.output_text });
-        } else {
-            response.status(404).send('Service ID not found');
-        }
-    })
-})
+  const serviceId = request.params.id;
+
+  try {
+    // Query for existing axe_instruction
+    const instructionResult = await pool.query(
+      'SELECT axe_instruction FROM service_rules WHERE service_id = $1',
+      [serviceId]
+    );
+
+    if (instructionResult.rows.length > 0) {
+      const axeInstruction = instructionResult.rows[0].axe_instruction;
+
+      if (axeInstruction) {
+        // ✅ Already exists — return it
+        return response.status(200).json({ serviceId: serviceId, axeInstruction });
+      }
+    }
+
+    // If not found or null, get full manual result
+    const fullResult = await pool.query(
+      'SELECT axe_full_manual_result FROM service_rules WHERE service_id = $1',
+      [serviceId]
+    );
+
+    if (fullResult.rows.length === 0) {
+      return response.status(404).send('Service ID not found');
+    }
+
+    const axeFullManualResult = fullResult.rows[0].axe_full_manual_result;
+
+    const instruction = await openaiClient.responses.create({
+      model: "gpt-4o-mini",
+      instructions: "Talk like a web accessibility expert.",
+      input: `How to fix the accessibility issues from this evaluation result: ${axeFullManualResult}?`,
+    });
+
+    // Save the new instruction in DB
+    await pool.query(
+      'UPDATE service_rules SET axe_instruction = $2 WHERE service_id = $1',
+      [serviceId, instruction.output_text]
+    );
+
+    return response.status(200).json({
+      service_id: serviceId,
+      instruction: instruction.output_text
+    });
+
+  } catch (error) {
+    console.error("Server error:", error);
+    return response.status(500).send('Internal Server Error');
+  }
+});
+
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
