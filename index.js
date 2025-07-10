@@ -46,7 +46,7 @@ const model = new ChatOpenAI({
 
 const prompt = ChatPromptTemplate.fromMessages([
     ["system", "You are a web accessibility expert with the latest knowledge."],
-    ["human", "How to fix the violation of the accessibility rule with id {ruleId} from this axe-core evaluation result: {result}?"],
+    ["human", "Use this axe-core evaluation result: {result}. How to specifically fix the violation of the accessibility the rule '{ruleId}' (only focus on this rule)?"],
     new MessagesPlaceholder("agent_scratchpad"),
 ]);
 
