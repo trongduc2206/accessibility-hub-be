@@ -142,6 +142,17 @@ app.post('/rules', (request, response) => {
     })
 })
 
+app.post('/service', (request, response) => {
+    const { serviceName, githubUrl } = request.body;
+    const serviceId = serviceName.toLowerCase().replace(/\s+/g, '') + Math.floor(10000 + Math.random() * 90000);
+    pool.query('INSERT INTO service_rules (service_name, service_id, github_url) VALUES ($1, $2, $3) RETURNING *', [serviceName, serviceId, githubUrl], (error, results) => {
+        if (error) {
+            throw error
+        }
+        response.status(201).send(`${results.rows[0].service_id}`)
+    })
+})
+
 app.put('/rules/:id', (request, response) => {
     console.log(request.body)
     const {
@@ -152,7 +163,6 @@ app.put('/rules/:id', (request, response) => {
         if (error) {
             throw error
         }
-        console.log(results.rows[0])
         response.status(200).send(`${results.rows[0].service_id}`)
     })
 })
