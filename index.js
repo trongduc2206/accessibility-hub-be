@@ -81,6 +81,20 @@ app.get('/rules-test', (request, response) => {
     response.send(rules)
 })
 
+app.get('/service/:serviceId', (request, response) => {
+    const serviceId = request.params.serviceId;
+    pool.query('SELECT * FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
+        if (error) {
+            throw error
+        }
+        if (results.rows && results.rows.length > 0) {
+            response.status(200).json(results.rows[0]);
+        } else {
+            response.status(404).send('Service ID not found');
+        }
+    })
+})
+
 app.post('/service-id', (request, response) => {
     const { serviceId } = request.body;
     pool.query('SELECT service_id FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
