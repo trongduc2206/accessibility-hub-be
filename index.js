@@ -35,7 +35,12 @@ const { GithubRepoLoader } = require("@langchain/community/document_loaders/web/
 const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter")
 const { MemoryVectorStore } = require("langchain/vectorstores/memory")
 const { OpenAIEmbeddings } = require("@langchain/openai")
-const { createRetrieverTool } = require("langchain/tools/retriever")
+const { createRetrieverTool } = require("langchain/tools/retriever");
+const { RetrievalQAChain } = require('langchain/chains');
+const { DynamicTool } = require('langchain/tools');
+const { initializeAgentExecutorWithOptions } = require('langchain/agents');
+
+
 
 
 const model = new ChatOpenAI({
@@ -46,16 +51,17 @@ const model = new ChatOpenAI({
 
 const prompt = ChatPromptTemplate.fromMessages([
     ["system", "You are a web accessibility expert with the latest knowledge."],
-    ["human", "Use this axe-core evaluation result: {result}. How to specifically fix the violation of the accessibility the rule '{ruleId}' (only focus on this rule)?"],
+    // new MessagesPlaceholder("agent_scratchpad"),
+    ["human", "Use this axe-core evaluation result: {result}. Use the violated HTML elements mentioned in the evaluation result, look into the corresponding code from the Github repo to answer the below question: How to specifically fix the violation of the accessibility the rule '{ruleId}' (only focus on this rule)?. If you cannot find anything from the code, just continue to answer the question based on your knowledge."],
     new MessagesPlaceholder("agent_scratchpad"),
 ]);
 
-const splitter = new RecursiveCharacterTextSplitter({
+const splitter = RecursiveCharacterTextSplitter.fromLanguage('js', {
     chunkSize: 200,
     chunkOverlap: 20,
 });
 
-const embeddings = new OpenAIEmbeddings();
+const embeddings = new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY_EMBEDDINGS });
 
 const searchTool = new TavilySearchResults({
     apiKey: process.env.TAVILY_API_KEY,
@@ -406,8 +412,9 @@ app.get('/axe-full-manual/:id', (request, response) => {
 //     }
 // });
 
+const vectorStoreCache = new Map();
 
-app.post('/instruction-agent/:id', async (request, response) => {
+app.post('/instruction-chain/:id', async (request, response) => {
     const serviceId = request.params.id;
     const { ruleId, githubUrl, githubBranch } = request.body;
     if (!serviceId) {
@@ -416,82 +423,156 @@ app.post('/instruction-agent/:id', async (request, response) => {
     if (!ruleId) {
         return response.status(400).send('No ruleId provided');
     }
-    
-    if (githubUrl) {
-        const loader = new GithubRepoLoader(
-            githubUrl,
-            {
-                branch: githubBranch || "main",
-                recursive: true,
-                unknown: "warn",
-                maxConcurrency: 2, // Defaults to 2
-                ignorePaths: [
-                    "node_modules",
-                    "dist",
-                    "build",
-                    ".git",
-                    "package-lock.json",
-                    "yarn.lock",
-                    "README.md",
-                    "*.svg",
-                    "*.png",
-                    "*.jpg",
-                    "*.gif",
-                    ".env",
-                    ".env.local",
-                    ".gitignore",
-                    "package.json",
-                    "public",
-                    ".github",
-                    "*.json",
-                    "*.md",
-                ]
+    let vectorStore;
+    let retriever;
+    try {
+        if (githubUrl) {
+            if (!vectorStoreCache.has(githubUrl)) {
+                console.log("not found in cache, loading from github:", githubUrl);
+                const loader = new GithubRepoLoader(
+                    githubUrl,
+                    {
+                        accessToken: process.env.GITHUB_ACCESS_TOKEN,
+                        branch: githubBranch || "main",
+                        recursive: true,
+                        unknown: "warn",
+                        maxConcurrency: 2, // Defaults to 2
+                        ignoreFiles: [
+                            "package-lock.json",
+                            "yarn.lock",
+                            "package.json",
+                            "README.md",
+                            ".env.local",
+                            ".env",
+                            ".gitignore",
+                        ],
+                        ignorePaths: [
+                            "node_modules",
+                            "dist",
+                            "build",
+                            ".git",
+                            "package-lock.json",
+                            "yarn.lock",
+                            "README.md",
+                            "*.svg",
+                            "*.png",
+                            "*.jpg",
+                            "*.gif",
+                            ".env",
+                            ".env.local",
+                            ".gitignore",
+                            "package.json",
+                            "public",
+                            ".github",
+                            "*.json",
+                            "*.md",
+                            ".cjs",
+                            ".mjs",
+                            "*.config.js",
+                            "**/assets/**",
+                            "**/static/**",
+                            "assets",
+                            "static",
+                            "**/back-end/**",
+                        ]
+                    }
+                );
+
+                const docs = await loader.load();
+
+                console.log(`Loaded documents from GitHub repository.`);
+
+                const splitDocs = await splitter.splitDocuments(docs);
+
+                console.log(`Split documents into ${splitDocs.length} chunks.`);
+
+                vectorStore = await MemoryVectorStore.fromDocuments(
+                    splitDocs,
+                    embeddings
+                );
+
+                console.log(`Created vector store with ${vectorStore.index} vectors.`);
+
+                console.log('create store', vectorStore)
+
+                console.log(`Created vector store vectors.`);
+                vectorStoreCache.set(githubUrl, vectorStore);
+            } else {
+                console.log("found in cache, using existing vector store for:", githubUrl);
+                vectorStore = vectorStoreCache.get(githubUrl);
             }
-        );
 
-        const docs = await loader.load();
+            retriever = vectorStore.asRetriever({
+                k: 5,
+            });
 
-        const splitDocs = await splitter.splitDocuments(docs);
+            const retrieverTool = createRetrieverTool(retriever, {
+                name: "code_search",
+                description:
+                    "Use this tool to get more information about the codebase so that you can provide more practical instructions to fix the accessibility issues. The input should be a question about the codebase, and the output will be a list of relevant code snippets.",
+            });
 
-        const vectorStore = await MemoryVectorStore.fromDocuments(
-            splitDocs,
-            embeddings
-        );
-
-        const retriever = vectorStore.asRetriever({
-            k: 2,
-        });
-
-        const retrieverTool = createRetrieverTool(retriever, {
-            name: "code_search",
-            description:
-                "Use this tool when searching for the code violating the accessibility rule in the evaluation result.",
-        });
-
-        tools.push(retrieverTool);
+            tools.push(retrieverTool);
+        }
+    } catch (error) {
+        console.error("Error loading GitHub repository:", error);
     }
 
-    const agent = await createOpenAIFunctionsAgent({
-        llm: model,
-        prompt: prompt,
-        tools: tools,
-    });
+    // const agent = await createOpenAIFunctionsAgent({
+    //     llm: model,
+    //     prompt: prompt,
+    //     tools: tools,
+    // });
 
-    const agentExecutor = new AgentExecutor({
-        agent,
-        tools: tools,
-    });
+    // const agentExecutor = new AgentExecutor({
+    //     agent,
+    //     tools: tools,
+    // });
+
+    // const agentExecutor = AgentExecutor.fromAgentAndTools({
+    //     agent,
+    //     tools: tools,
+    // });
 
     const evaluationResult = await pool.query(
         'SELECT axe_full_manual_result FROM service_rules WHERE service_id = $1',
         [serviceId]
     );
+
     if (evaluationResult.rows.length === 0) {
         return response.status(404).send('Service ID not found');
     }
 
     const axeFullManualResult = evaluationResult.rows[0].axe_full_manual_result;
 
+    if (retriever !== undefined && retriever !== null) {
+        console.log("Using retriever for instruction generation");
+        const chain = RetrievalQAChain.fromLLM(model, retriever)
+        // const formattedMessages = prompt.formatMessages({
+        //     result: axeFullManualResult,
+        //     ruleId: ruleId,
+        // });
+        // console.log("Formatted messages:", formattedMessages);
+        const promptTest = `
+You are an expert in web accessibility. Based on the following axe-core accessibility evaluation report, 
+and the corresponding code snippets from the GitHub repo, provide detailed and specific instructions for how to fix each accessibility violation. 
+
+Report:
+${axeFullManualResult}
+
+Focus on the rule: ${ruleId}
+`;
+        const result = await chain.invoke({
+            // query: formattedMessages.map(m => m.content).join('\n\n') 
+            query: promptTest,
+        });
+        return response.status(200).json({
+            service_id: "instruction-agent",
+            instruction: result.text,
+        });
+    }
+
+    console.log("retriever is undefined, using agent executor for instruction generation");
     const agentResponse = await agentExecutor.invoke({
         ruleId: ruleId,
         result: axeFullManualResult,
@@ -502,6 +583,158 @@ app.post('/instruction-agent/:id', async (request, response) => {
         instruction: agentResponse.output,
         // instruction: "test"
     });
+});
+
+app.post('/instruction-agent/:id', async (req, res) => {
+    const serviceId = req.params.id;
+
+    const { githubUrl, ruleId, githubBranch } = req.body;
+
+    if (!serviceId) {
+        return res.status(400).json({ error: 'Missing serviceId' });
+    }
+
+    if (!ruleId) {
+        return res.status(400).json({ error: 'Missing githubUrl' });
+    }
+
+    const evaluationResult = await pool.query(
+        'SELECT axe_full_manual_result FROM service_rules WHERE service_id = $1',
+        [serviceId]
+    );
+
+    if (evaluationResult.rows.length === 0) {
+        return response.status(404).send('Service ID not found');
+    }
+
+    const axeFullManualResult = evaluationResult.rows[0].axe_full_manual_result;
+
+    try {
+        // Step 1: Load GitHub code
+        if (githubUrl) {
+            let vectorStore;
+            if (!vectorStoreCache.has(githubUrl)) {
+                const loader = new GithubRepoLoader(githubUrl, {
+                    accessToken: process.env.GITHUB_ACCESS_TOKEN,
+                    branch: githubBranch || "main",
+                    recursive: true,
+                    unknown: "warn",
+                    ignoreFiles: [
+                        "package-lock.json",
+                        "yarn.lock",
+                        "package.json",
+                        "README.md",
+                        ".env.local",
+                        ".env",
+                        ".gitignore",
+                    ],
+                    ignorePaths: [
+                        "node_modules",
+                        "dist",
+                        "build",
+                        ".git",
+                        "package-lock.json",
+                        "yarn.lock",
+                        "README.md",
+                        "*.svg",
+                        "*.png",
+                        "*.jpg",
+                        "*.gif",
+                        ".env",
+                        ".env.local",
+                        ".gitignore",
+                        "package.json",
+                        "public",
+                        ".github",
+                        "*.json",
+                        "*.md",
+                        ".cjs",
+                        ".mjs",
+                        "*.config.js",
+                        "**/assets/**",
+                        "**/static/**",
+                        "assets",
+                        "static",
+                        "**/back-end/**",
+                    ]
+                });
+                const docs = await loader.load();
+
+                // Step 2: Chunk + embed
+                const splitter = new RecursiveCharacterTextSplitter({
+                    chunkSize: 1000,
+                    chunkOverlap: 100,
+                });
+                const splitDocs = await splitter.splitDocuments(docs);
+
+                vectorStore = await MemoryVectorStore.fromDocuments(
+                    splitDocs,
+                    embeddings,
+                );
+                console.log('create vector store')
+                vectorStoreCache.set(githubUrl, vectorStore);
+            } else {
+                console.log("Using cached vector store for:", githubUrl);
+                vectorStore = vectorStoreCache.get(githubUrl);
+            }
+
+
+            const retriever = vectorStore.asRetriever();
+
+            // Step 3: Define search tool
+            const searchCodeTool = new DynamicTool({
+                name: 'search_codebase',
+                description: 'Search the website codebase for relevant code using a natural language query.',
+                func: async (query) => {
+                    const results = await retriever.getRelevantDocuments(query);
+                    return results.map((doc) => `From ${doc.metadata.source}:\n${doc.pageContent}`).join('\n\n');
+                },
+            });
+
+            const task = `
+    You are an expert in fixing web accessibility issues.
+    Below is an axe-core accessibility evaluation report. Your job is to:
+    1. Focus on the violated rule with ID ${ruleId}.
+    2. Use the "search_codebase" tool to locate relevant code that causes or relates to the violated rule.
+    3. Give the developer precise, file-specific instructions to fix the specific rule with ID ${ruleId}.
+    Do not invent issues. Always ground answers in the report and actual code retrieved from the tool.
+    axe-core Report:
+    -------------------
+    ${axeFullManualResult}
+            `.trim();
+
+            const executor = await initializeAgentExecutorWithOptions(
+                [searchCodeTool],
+                model,
+                {
+                    agentType: 'openai-functions',
+                    verbose: true,
+                }
+            );
+
+            const result = await executor.invoke({ input: task });
+
+            return res.json({ output: result.output });
+        } else {
+            console.log("No GitHub URL provided, using axe report directly");
+            const simplePrompt = `
+You are a senior accessibility expert.
+Below is an axe-core accessibility report. Based on this report, provide detailed instructions to fix the violated rule with ID ${ruleId}.
+Axe Report:
+--------
+${axeFullManualResult}
+      `.trim();
+
+            const response = await model.invoke(simplePrompt);
+            console.log("Response from model:", response);
+            return res.json({ output: response.content});
+        }
+
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Agent execution failed' });
+    }
 });
 
 const PORT = process.env.PORT || 3000
