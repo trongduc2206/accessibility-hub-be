@@ -163,9 +163,9 @@ app.post('/rules', (request, response) => {
 })
 
 app.post('/service', (request, response) => {
-    const { serviceName, githubUrl } = request.body;
+    const { serviceName, githubUrl, githubBranch } = request.body;
     const serviceId = serviceName.toLowerCase().replace(/\s+/g, '') + Math.floor(10000 + Math.random() * 90000);
-    pool.query('INSERT INTO service_rules (service_name, service_id, github_url) VALUES ($1, $2, $3) RETURNING *', [serviceName, serviceId, githubUrl], (error, results) => {
+    pool.query('INSERT INTO service_rules (service_name, service_id, github_url, github_branch) VALUES ($1, $2, $3, $4) RETURNING *', [serviceName, serviceId, githubUrl, githubBranch], (error, results) => {
         if (error) {
             throw error
         }
@@ -186,6 +186,44 @@ app.put('/rules/:id', (request, response) => {
         response.status(200).send(`${results.rows[0].service_id}`)
     })
 })
+
+app.put('/service/:id', async (request, response) => {
+    const serviceId = request.params.id;
+    const { serviceName, githubUrl, githubBranch } = request.body;
+
+    try {
+        // Fetch the current row
+        const currentResult = await pool.query(
+            'SELECT * FROM service_rules WHERE service_id = $1',
+            [serviceId]
+        );
+
+        if (currentResult.rows.length === 0) {
+            return response.status(404).json({ error: 'Service not found' });
+        }
+
+        const current = currentResult.rows[0];
+
+        // Use current values if not provided in the request body
+        const updatedServiceName = serviceName ?? current.service_name;
+        const updatedGithubUrl = githubUrl ?? current.github_url;
+        const updatedGithubBranch = githubBranch ?? current.github_branch;
+
+        // Perform the update
+        const updateResult = await pool.query(
+            `UPDATE service_rules 
+             SET service_name = $2, github_url = $3, github_branch = $4 
+             WHERE service_id = $1 
+             RETURNING *`,
+            [serviceId, updatedServiceName, updatedGithubUrl, updatedGithubBranch]
+        );
+
+        response.status(200).json(updateResult.rows[0]);
+    } catch (error) {
+        console.error(error);
+        response.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 app.put('/ignore-pa11y-rules/:id', (request, response) => {
     console.log(request.body)
