@@ -46,7 +46,8 @@ const { initializeAgentExecutorWithOptions } = require('langchain/agents');
 const model = new ChatOpenAI({
     model: "gpt-4o-mini",
     temperature: 0.7,
-    apiKey: process.env.OPENAI_API_KEY,
+    // apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY_EMBEDDINGS,
 });
 
 const prompt = ChatPromptTemplate.fromMessages([
@@ -167,7 +168,7 @@ app.post('/service', (request, response) => {
     const serviceId = serviceName.toLowerCase().replace(/\s+/g, '') + Math.floor(10000 + Math.random() * 90000);
     pool.query('INSERT INTO service_rules (service_name, service_id, github_url, github_branch) VALUES ($1, $2, $3, $4) RETURNING *', [serviceName, serviceId, githubUrl, githubBranch], (error, results) => {
         if (error) {
-            throw error
+            throw error 
         }
         response.status(201).send(`${results.rows[0].service_id}`)
     })

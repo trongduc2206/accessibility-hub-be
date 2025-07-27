@@ -16,3 +16,20 @@ CREATE TABLE public.service_rules (
 	axe_instruction text NULL,
 	CONSTRAINT service_rules_pk PRIMARY KEY (id)
 );
+
+-- 21-07-2025
+
+CREATE TABLE public.service_rules (
+	id serial4 NOT NULL,
+	service_name varchar NOT NULL,
+	service_id varchar NULL,
+	rule_ids varchar NULL,
+	ignore_pa11y_rule_ids varchar NULL,
+	manual_failed_rule_ids varchar NULL,
+	manual_failed_rule_ids_pa11y varchar NULL,
+	axe_full_manual_result text NULL,
+	axe_instruction text NULL,
+	github_url varchar NULL,
+	github_branch varchar NULL,
+	CONSTRAINT service_rules_pk PRIMARY KEY (id)
+);
