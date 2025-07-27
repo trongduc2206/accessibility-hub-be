@@ -321,7 +321,7 @@ app.post('/axe-full-manual', (request, response) => {
 app.get('/manual-failed-rule-ids/:id', (request, response) => {
     const serviceId = request.params.id;
 
-    pool.query('SELECT manual_failed_rule_ids, manual_failed_rule_ids_pa11y  FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
+    pool.query('SELECT manual_failed_rule_ids, manual_failed_rule_ids_pa11y, axe_full_manual_result FROM service_rules WHERE service_id=$1', [serviceId], (error, results) => {
         if (error) {
             throw error
         }
@@ -330,7 +330,8 @@ app.get('/manual-failed-rule-ids/:id', (request, response) => {
             const ruleIdsArray = ruleIdsString ? ruleIdsString.split(',') : [];
             const ruleCodesString = results.rows[0].manual_failed_rule_ids_pa11y;
             const ruleCodesArray = ruleCodesString ? ruleCodesString.split(',') : [];
-            response.status(200).json({ service_id: serviceId, manual_failed_rule_ids: ruleIdsArray, manual_failed_rule_ids_pa11y: ruleCodesArray });
+            const axeFullManualResult = results.rows[0].axe_full_manual_result;
+            response.status(200).json({ service_id: serviceId, manual_failed_rule_ids: ruleIdsArray, manual_failed_rule_ids_pa11y: ruleCodesArray, axe_full_manual_result: axeFullManualResult });
         } else {
             response.status(404).send('Service ID not found');
         }
