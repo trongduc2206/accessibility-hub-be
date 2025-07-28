@@ -736,7 +736,7 @@ app.post('/instruction-agent/:id', async (req, res) => {
     Below is an axe-core accessibility evaluation report. Your job is to:
     1. Focus on the violated rule with ID ${ruleId}.
     2. Use the "search_codebase" tool to locate relevant code that causes or relates to the violated rule.
-    3. Give the developer precise, file-specific instructions to fix the specific rule with ID ${ruleId}.
+    3. Give the developer precise, file-specific instructions to fix the specific rule with ID ${ruleId} correspondingly to each found code.
     Do not invent issues. Always ground answers in the report and actual code retrieved from the tool.
     axe-core Report:
     -------------------
